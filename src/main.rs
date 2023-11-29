@@ -19,7 +19,9 @@ mod logic;
 pub struct Game {
     id: String,
     ruleset: HashMap<String, Value>,
+    map: String,
     timeout: u32,
+    source: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -115,7 +117,7 @@ fn rocket() -> _ {
     rocket::build()
         .attach(AdHoc::on_response("Server ID Middleware", |_, res| {
             Box::pin(async move {
-                res.set_raw_header("Server", "battlesnake/github/starter-snake-rust");
+                res.set_raw_header("Server", "squaredx/boa-checker-snek");
             })
         }))
         .mount(

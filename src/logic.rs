@@ -25,7 +25,7 @@ pub fn info() -> Value {
 
     return json!({
         "apiversion": "1",
-        "author": "", // TODO: Your Battlesnake Username
+        "author": "squaredx", // TODO: Your Battlesnake Username
         "color": "#888888", // TODO: Choose color
         "head": "default", // TODO: Choose head
         "tail": "default", // TODO: Choose tail
@@ -74,8 +74,8 @@ pub fn get_move(_game: &Game, turn: &u32, _board: &Board, you: &Battlesnake) -> 
     }
 
     // TODO: Step 1 - Prevent your Battlesnake from moving out of bounds
-    // let board_width = &board.width;
-    // let board_height = &board.height;
+    let board_width = &_board.width;
+    let board_height = &_board.height;
 
     // TODO: Step 2 - Prevent your Battlesnake from colliding with itself
     // let my_body = &you.body;
