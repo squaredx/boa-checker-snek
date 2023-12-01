@@ -1,8 +1,22 @@
+use std::cmp::Ordering;
+
+#[derive(PartialEq)]
 pub enum Movement {
     Right,
     Left,
     Up,
     Down,
+}
+
+impl std::fmt::Display for Movement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Movement::Right => write!(f, "right"),
+            Movement::Left => write!(f, "left"),
+            Movement::Up => write!(f, "up"),
+            Movement::Down => write!(f, "down"),
+        }
+    }
 }
 
 pub struct WeightedMovement {
@@ -50,12 +64,14 @@ impl WeightedMovementSet {
         });
     }
 
-    pub fn pick_movement(&self) -> Movement {
-        pub fn pick_movement(&self) -> Option<&Movement> {
-            self.moves
-                .iter()
-                .max_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap())
-                .map(|wm| &wm.movement)
-        }
+    pub fn pick_movement(&self) -> Option<&Movement> {
+        self.moves
+            .iter()
+            .max_by(|a, b| {
+                a.probability
+                    .partial_cmp(&b.probability)
+                    .unwrap_or(Ordering::Equal)
+            })
+            .map(|weighted_movement| &weighted_movement.movement)
     }
 }

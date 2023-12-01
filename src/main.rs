@@ -10,7 +10,7 @@ use serde_json::{Value};
 use std::collections::HashMap;
 use std::env;
 
-mod logic;
+mod game;
 
 // API and Response Objects
 // See https://docs.battlesnake.com/api
@@ -61,12 +61,12 @@ pub struct GameState {
 
 #[get("/")]
 fn handle_index() -> Json<Value> {
-    Json(logic::info())
+    Json(crate::game::logic::handle_info())
 }
 
 #[post("/start", format = "json", data = "<start_req>")]
 fn handle_start(start_req: Json<GameState>) -> Status {
-    logic::start(
+    crate::game::logic::handle_start(
         &start_req.game,
         &start_req.turn,
         &start_req.board,
@@ -78,7 +78,7 @@ fn handle_start(start_req: Json<GameState>) -> Status {
 
 #[post("/move", format = "json", data = "<move_req>")]
 fn handle_move(move_req: Json<GameState>) -> Json<Value> {
-    let response = logic::get_move(
+    let response = crate::game::logic::handle_move(
         &move_req.game,
         &move_req.turn,
         &move_req.board,
@@ -90,7 +90,7 @@ fn handle_move(move_req: Json<GameState>) -> Json<Value> {
 
 #[post("/end", format = "json", data = "<end_req>")]
 fn handle_end(end_req: Json<GameState>) -> Status {
-    logic::end(&end_req.game, &end_req.turn, &end_req.board, &end_req.you);
+    crate::game::logic::handle_end(&end_req.game, &end_req.turn, &end_req.board, &end_req.you);
 
     Status::Ok
 }
