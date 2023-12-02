@@ -4,11 +4,6 @@ use serde_json::{json, Value};
 use crate::{Battlesnake, Board, Game, Coord};
 use crate::game::movement::{Movement, WeightedMovementSet};
 
-pub struct PotentialMoves {
-    position: Coord,
-    movement: Movement,
-}
-
 // info is called when you create your Battlesnake on play.battlesnake.com
 // and controls your Battlesnake's appearance
 // TIP: If you open your Battlesnake URL in a browser you should see this data
@@ -38,15 +33,14 @@ pub fn handle_end(_game: &Game, _turn: &u32, _board: &Board, _you: &Battlesnake)
 // Valid moves are "up", "down", "left", or "right"
 // See https://docs.battlesnake.com/api/example-move for available data
 pub fn handle_move(_game: &Game, turn: &u32, _board: &Board, you: &Battlesnake) -> Value {
-    let mut moves = WeightedMovementSet::new();
-    //TODO: Optimize by having a vector of potential move so that we can share in the avoid functions
+    let mut moves = WeightedMovementSet::new(&you.body[0]);
 
     let board_width = &_board.width;
     let board_height = &_board.height;
 
-    avoid_out_of_bounds(board_width, board_height, you, &mut moves);
+    avoid_out_of_bounds(board_width, board_height,  &mut moves);
     avoid_myself(&you, &mut moves);
-    //avoid_other_snakes(&you, &mut moves);
+    avoid_baddies(&_board.snakes, &mut moves);
     //avoid_small_spaces
     //if health < 50
     //find_closest_food
@@ -57,51 +51,51 @@ pub fn handle_move(_game: &Game, turn: &u32, _board: &Board, you: &Battlesnake) 
     return json!({ "move": chosen.to_string() });
 }
 
-fn avoid_out_of_bounds(width: &i32, height: &i32, snake: &Battlesnake, set: &mut WeightedMovementSet) {
-    let my_head = &snake.body[0];
-    let potential_moves = make_potential_moves(my_head);
-
-    for potential_move in potential_moves {
-        if potential_move.position.x < 0 || potential_move.position.x >= *width || potential_move.position.y < 0 || potential_move.position.y >= *height {
-            println!("OOB - Removing {}", potential_move.movement.to_string());
-            set.remove(&potential_move.movement);
+fn avoid_out_of_bounds(width: &i32, height: &i32, set: &mut WeightedMovementSet) {
+    for future_move in set.moves.clone() {
+        if future_move.position.x < 0 || future_move.position.x >= *width || future_move.position.y < 0 || future_move.position.y >= *height {
+            println!("OOB - Removing {}", future_move.movement.to_string());
+            set.remove(&future_move.movement);
         }
     }
 }
 
 fn avoid_myself(snake: &Battlesnake, set: &mut WeightedMovementSet) {
-    let my_head = &snake.body[0];
     let my_tail = get_tail(snake);
-    let potential_moves = make_potential_moves(my_head);
     let stacked = is_stacked(snake);
 
-    for potential_move in potential_moves {
-        if snake.body.contains(&potential_move.position) && !(potential_move.position == *my_tail && !stacked) {
-            println!("MYSELF - Removing {}", potential_move.movement.to_string());
-            set.remove(&potential_move.movement);
+    for future_moves in set.moves.clone() {
+        if snake.body.contains(&future_moves.position) && !(future_moves.position == *my_tail && !stacked) {
+            println!("MYSELF - Removing {}", future_moves.movement.to_string());
+            set.remove(&future_moves.movement);
         }
     }
 }
 
-fn make_potential_moves(head_coord: &Coord) -> Vec<PotentialMoves> {
-    vec![
-        PotentialMoves {
-            position: Coord { x: head_coord.x, y: head_coord.y + 1 },
-            movement: Movement::Up,
-        },
-        PotentialMoves {
-            position: Coord { x: head_coord.x, y: head_coord.y - 1 },
-            movement: Movement::Down,
-        },
-        PotentialMoves {
-            position: Coord { x: head_coord.x - 1, y: head_coord.y },
-            movement: Movement::Left,
-        },
-        PotentialMoves {
-            position: Coord { x: head_coord.x + 1, y: head_coord.y },
-            movement: Movement::Right,
-        },
-    ]
+fn avoid_baddies(baddies: &Vec<Battlesnake>, set: &mut WeightedMovementSet) {
+    for baddy in baddies {
+        let baddy_head = &baddy.body[0];
+        let baddy_tail = get_tail(baddy);
+        let baddy_stacked = is_stacked(baddy);
+
+        for future_move in set.moves.clone() {
+            let distance = manhattan_distance(&future_move.position, baddy_head);
+            println!("BADDY - Manhattan distance is {}", distance);
+            if distance <= 2 {
+                let previous_probability = set.get_probability(&future_move.movement);
+                let updated_probability = previous_probability * (1.0 - (distance as f32 / 2.0));
+                println!("BADDY - Reducing {} probability from {} to {}", future_move.movement.to_string(), updated_probability, updated_probability);
+                set.update_probability(&future_move.movement, updated_probability);
+            } else if baddy.body.contains(&future_move.position) && !(future_move.position == *baddy_tail && !baddy_stacked) {
+                println!("BADDY - Removing {}", future_move.movement.to_string());
+                set.remove(&future_move.movement);
+            }
+        }
+    }
+}
+
+fn manhattan_distance(a: &Coord, b: &Coord) -> i32 {
+    (a.x - b.x).abs() + (a.y - b.y).abs()
 }
 
 fn is_stacked(snake: &Battlesnake) -> bool {

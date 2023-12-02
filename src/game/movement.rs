@@ -1,7 +1,9 @@
 use std::cmp::Ordering;
 use rand::Rng;
 
-#[derive(PartialEq)]
+use crate::Coord;
+
+#[derive(PartialEq, Clone)]
 pub enum Movement {
     Right,
     Left,
@@ -20,33 +22,40 @@ impl std::fmt::Display for Movement {
     }
 }
 
+#[derive(Clone)]
 pub struct WeightedMovement {
     pub movement: Movement,
+    pub position: Coord,
     pub probability: f32,
 }
+
 
 pub struct WeightedMovementSet {
     pub moves: Vec<WeightedMovement>,
 }
 
 impl WeightedMovementSet {
-    pub fn new() -> WeightedMovementSet {
+    pub fn new(head_coord: &Coord) -> WeightedMovementSet {
         WeightedMovementSet {
             moves: vec![
                 WeightedMovement {
                     movement: Movement::Right,
+                    position: Coord { x: head_coord.x + 1, y: head_coord.y },
                     probability: 1.0,
                 },
                 WeightedMovement {
                     movement: Movement::Left,
+                    position: Coord { x: head_coord.x - 1, y: head_coord.y },
                     probability: 1.0,
                 },
                 WeightedMovement {
                     movement: Movement::Up,
+                    position: Coord { x: head_coord.x, y: head_coord.y + 1 },
                     probability: 1.0,
                 },
                 WeightedMovement {
                     movement: Movement::Down,
+                    position: Coord { x: head_coord.x, y: head_coord.y - 1 },
                     probability: 1.0,
                 },
             ],
@@ -57,12 +66,19 @@ impl WeightedMovementSet {
         self.moves.retain(|m| m.movement != *movement);
     }
 
-    pub fn update_probability(&mut self, movement: Movement, probability: f32) {
-        self.remove(&movement);
-        self.moves.push(WeightedMovement {
-            movement,
-            probability,
-        });
+    pub fn update_probability(&mut self, movement: &Movement, probability: f32) {
+        self.moves
+            .iter_mut()
+            .find(|wm| wm.movement == *movement)
+            .map(|wm| wm.probability = probability);
+    }
+
+    pub fn get_probability(&self, movement: &Movement) -> f32 {
+        self.moves
+            .iter()
+            .find(|wm| wm.movement == *movement)
+            .map(|wm| wm.probability)
+            .unwrap_or(0.0)
     }
 
 
