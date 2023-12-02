@@ -1,24 +1,13 @@
-// Welcome to
-// __________         __    __  .__                               __
-// \______   \_____ _/  |__/  |_|  |   ____   ______ ____ _____  |  | __ ____
-//  |    |  _/\__  \\   __\   __\  | _/ __ \ /  ___//    \\__  \ |  |/ // __ \
-//  |    |   \ / __ \|  |  |  | |  |_\  ___/ \___ \|   |  \/ __ \|    <\  ___/
-//  |________/(______/__|  |__| |____/\_____>______>___|__(______/__|__\\_____>
-//
-// This file can be a nice home for your Battlesnake logic and helper functions.
-//
-// To get you started we've included code to prevent your Battlesnake from moving backwards.
-// For more info see docs.battlesnake.com
-
-
 use log::info;
-use rand::seq::SliceRandom;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 
-use crate::{Battlesnake, Board, Game};
-use crate::game::movement::{Movement, WeightedMovement, WeightedMovementSet};
+use crate::{Battlesnake, Board, Game, Coord};
+use crate::game::movement::{Movement, WeightedMovementSet};
 
+pub struct PotentialMoves {
+    position: Coord,
+    movement: Movement,
+}
 
 // info is called when you create your Battlesnake on play.battlesnake.com
 // and controls your Battlesnake's appearance
@@ -29,9 +18,9 @@ pub fn handle_info() -> Value {
     return json!({
         "apiversion": "1",
         "author": "squaredx", // TODO: Your Battlesnake Username
-        "color": "#888888", // TODO: Choose color
-        "head": "default", // TODO: Choose head
-        "tail": "default", // TODO: Choose tail
+        "color": "#0099cc", // TODO: Choose color
+        "head": "silly", // TODO: Choose head
+        "tail": "nr-booster", // TODO: Choose tail
     });
 }
 
@@ -49,59 +38,87 @@ pub fn handle_end(_game: &Game, _turn: &u32, _board: &Board, _you: &Battlesnake)
 // Valid moves are "up", "down", "left", or "right"
 // See https://docs.battlesnake.com/api/example-move for available data
 pub fn handle_move(_game: &Game, turn: &u32, _board: &Board, you: &Battlesnake) -> Value {
-    
-    // let mut is_move_safe: HashMap<_, _> = vec![
-    //     ("up", true),
-    //     ("down", true),
-    //     ("left", true),
-    //     ("right", true),
-    // ]
-    // .into_iter()
-    // .collect();
-
     let mut moves = WeightedMovementSet::new();
+    //TODO: Optimize by having a vector of potential move so that we can share in the avoid functions
 
-    // We've included code to prevent your Battlesnake from moving backwards
-    let my_head = &you.body[0]; // Coordinates of your head
-    let my_neck = &you.body[1]; // Coordinates of your "neck"
-    
-    if my_neck.x < my_head.x { // Neck is left of head, don't move left
-        //is_move_safe.insert("left", false);
-        moves.remove(&Movement::Left);
-    } else if my_neck.x > my_head.x { // Neck is right of head, don't move right
-        //is_move_safe.insert("right", false);
-        moves.remove(&Movement::Right);
-    } else if my_neck.y < my_head.y { // Neck is below head, don't move down
-       // is_move_safe.insert("down", false);
-       moves.remove(&Movement::Down);
-    } else if my_neck.y > my_head.y { // Neck is above head, don't move up
-        //is_move_safe.insert("up", false);
-        moves.remove(&Movement::Up);
-    }
+    let board_width = &_board.width;
+    let board_height = &_board.height;
 
-    // // TODO: Step 1 - Prevent your Battlesnake from moving out of bounds
-    // let board_width = &_board.width;
-    // let board_height = &_board.height;
+    avoid_out_of_bounds(board_width, board_height, you, &mut moves);
+    avoid_myself(&you, &mut moves);
+    //avoid_other_snakes(&you, &mut moves);
+    //avoid_small_spaces
+    //if health < 50
+    //find_closest_food
 
-    // // TODO: Step 2 - Prevent your Battlesnake from colliding with itself
-    // // let my_body = &you.body;
 
-    // // TODO: Step 3 - Prevent your Battlesnake from colliding with other Battlesnakes
-    // // let opponents = &board.snakes;
-
-    // // Are there any safe moves left?
-    // let safe_moves = is_move_safe
-    //     .into_iter()
-    //     .filter(|&(_, v)| v)
-    //     .map(|(k, _)| k)
-    //     .collect::<Vec<_>>();
-    
-    // // Choose a random move from the safe ones
-    let chosen = moves.pick_movement().unwrap_or(&Movement::Up);//safe_moves.choose(&mut rand::thread_rng()).unwrap();
-
-    // // TODO: Step 4 - Move towards food instead of random, to regain health and survive longer
-    // // let food = &board.food;
-
+    let chosen = moves.pick_movement().unwrap_or(&Movement::Up);
     info!("MOVE {}: {}", turn, chosen.to_string());
     return json!({ "move": chosen.to_string() });
+}
+
+fn avoid_out_of_bounds(width: &i32, height: &i32, snake: &Battlesnake, set: &mut WeightedMovementSet) {
+    let my_head = &snake.body[0];
+    let potential_moves = make_potential_moves(my_head);
+
+    for potential_move in potential_moves {
+        if potential_move.position.x < 0 || potential_move.position.x >= *width || potential_move.position.y < 0 || potential_move.position.y >= *height {
+            println!("OOB - Removing {}", potential_move.movement.to_string());
+            set.remove(&potential_move.movement);
+        }
+    }
+}
+
+fn avoid_myself(snake: &Battlesnake, set: &mut WeightedMovementSet) {
+    let my_head = &snake.body[0];
+    let my_tail = get_tail(snake);
+    let potential_moves = make_potential_moves(my_head);
+    let stacked = is_stacked(snake);
+
+    for potential_move in potential_moves {
+        if snake.body.contains(&potential_move.position) && !(potential_move.position == *my_tail && !stacked) {
+            println!("MYSELF - Removing {}", potential_move.movement.to_string());
+            set.remove(&potential_move.movement);
+        }
+    }
+}
+
+fn make_potential_moves(head_coord: &Coord) -> Vec<PotentialMoves> {
+    vec![
+        PotentialMoves {
+            position: Coord { x: head_coord.x, y: head_coord.y + 1 },
+            movement: Movement::Up,
+        },
+        PotentialMoves {
+            position: Coord { x: head_coord.x, y: head_coord.y - 1 },
+            movement: Movement::Down,
+        },
+        PotentialMoves {
+            position: Coord { x: head_coord.x - 1, y: head_coord.y },
+            movement: Movement::Left,
+        },
+        PotentialMoves {
+            position: Coord { x: head_coord.x + 1, y: head_coord.y },
+            movement: Movement::Right,
+        },
+    ]
+}
+
+fn is_stacked(snake: &Battlesnake) -> bool {
+    let body = &snake.body;
+    let mut prev_coord = None;
+
+    for coord in body {
+        if let Some(prev) = prev_coord {
+            if coord == prev {
+                return true;
+            }
+        }
+        prev_coord = Some(coord);
+    }
+    false
+}
+
+fn get_tail(snake: &Battlesnake) -> &Coord {
+    snake.body.last().unwrap()
 }

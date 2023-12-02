@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use rand::Rng;
 
 #[derive(PartialEq)]
 pub enum Movement {
@@ -64,14 +65,28 @@ impl WeightedMovementSet {
         });
     }
 
+
     pub fn pick_movement(&self) -> Option<&Movement> {
-        self.moves
+        let mut rng = rand::thread_rng();
+
+        let max_probability = self
+            .moves
             .iter()
-            .max_by(|a, b| {
-                a.probability
-                    .partial_cmp(&b.probability)
-                    .unwrap_or(Ordering::Equal)
-            })
-            .map(|weighted_movement| &weighted_movement.movement)
+            .map(|wm| wm.probability)
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+
+        if let Some(max_probability) = max_probability {
+            let candidates: Vec<&WeightedMovement> = self
+                .moves
+                .iter()
+                .filter(|wm| wm.probability == max_probability)
+                .collect();
+
+            if !candidates.is_empty() {
+                let random_index = rng.gen_range(0..candidates.len());
+                return Some(&candidates[random_index].movement);
+            }
+        }
+        None
     }
 }

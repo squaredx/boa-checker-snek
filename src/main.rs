@@ -26,8 +26,8 @@ pub struct Game {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Board {
-    height: u32,
-    width: u32,
+    height: i32,
+    width: i32,
     food: Vec<Coord>,
     snakes: Vec<Battlesnake>,
     hazards: Vec<Coord>,
@@ -37,7 +37,7 @@ pub struct Board {
 pub struct Battlesnake {
     id: String,
     name: String,
-    health: u32,
+    health: i32,
     body: Vec<Coord>,
     head: Coord,
     length: u32,
@@ -45,10 +45,10 @@ pub struct Battlesnake {
     shout: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub struct Coord {
-    x: u32,
-    y: u32,
+    x: i32,
+    y: i32,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
