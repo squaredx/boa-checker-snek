@@ -1,8 +1,11 @@
 use log::info;
 use serde_json::{json, Value};
+use pathfinding::prelude::astar;
 
 use crate::{Battlesnake, Board, Game, Coord};
 use crate::game::movement::{Movement, WeightedMovementSet};
+
+static FOOD_GREEDY_FACTOR: f32 = 0.5;
 
 // info is called when you create your Battlesnake on play.battlesnake.com
 // and controls your Battlesnake's appearance
@@ -42,9 +45,31 @@ pub fn handle_move(_game: &Game, turn: &u32, _board: &Board, you: &Battlesnake) 
     avoid_myself(&you, &mut moves);
     avoid_baddies(&_board.snakes, &mut moves);
     //avoid_small_spaces
-    //if health < 50
-    //find_closest_food
 
+    if you.health <= 50 {
+        let closest_food = find_closest_food(&you.body[0], &_board);
+        if let Some(food) = closest_food {
+            let path_to_food = find_path_to_food(&you, &_board, &you.body[0], &food);
+
+            if let Some(path) = path_to_food {
+                let next_coord = path.0.get(1).cloned().unwrap();
+                let movement = convert_coord_to_movement(&you.body[0], &next_coord);
+                println!("FOOD - Health: {}, Distance: {}, Movement: {}", you.health, path.1, movement.to_string());
+
+                let updated_probability = moves.get_probability(&movement) * ( 1.0 + FOOD_GREEDY_FACTOR);
+
+                moves.update_probability(&movement, updated_probability);
+                
+                for future_move in moves.moves.clone() {
+                    if future_move.movement != movement {
+                        moves.update_probability(&future_move.movement,  moves.get_probability(&movement) * FOOD_GREEDY_FACTOR);
+                    }
+                }
+            }
+        }
+    }
+
+    println!("MOVES: {}", moves.to_string());
 
     let chosen = moves.pick_movement().unwrap_or(&Movement::Up);
     info!("MOVE {}: {}", turn, chosen.to_string());
@@ -94,8 +119,70 @@ fn avoid_baddies(baddies: &Vec<Battlesnake>, set: &mut WeightedMovementSet) {
     }
 }
 
+fn find_path_to_food(snake: &Battlesnake, board: &Board, start: &Coord, goal: &Coord) -> Option<(Vec<Coord>, i32)> {
+    astar(
+        start,
+        |p| get_neighbors(snake, board, p),
+        |p| manhattan_distance(p, goal),
+        |p| *p == *goal,
+    )
+}
+
+fn find_closest_food(head_coord: &Coord, board: &Board) -> Option<Coord> {
+    let mut closest_food: Option<Coord> = None;
+    let mut closest_distance = i32::MAX;
+
+    for food in &board.food {
+        let distance = manhattan_distance(head_coord, food);
+        if distance < closest_distance {
+            closest_distance = distance;
+            closest_food = Some(food.clone());
+        }
+    }
+
+    closest_food
+}
+
+fn get_neighbors(snake: &Battlesnake, board: &Board, coord: &Coord) -> Vec<(Coord, i32)> {
+    let mut neighbors = Vec::new();
+    let directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]; // Up, Down, Left, Right
+
+    for (dx, dy) in directions.iter() {
+        let new_coord = Coord {
+            x: coord.x + dx,
+            y: coord.y + dy,
+        };
+        if astar_is_valid(snake, board, &new_coord) {
+            neighbors.push((new_coord, 1)); // Each move costs 1
+        }
+    }
+
+    neighbors
+}
+
+fn astar_is_valid(snake: &Battlesnake, board: &Board, coord: &Coord) -> bool {
+    coord.x >= 0 && coord.x < board.width && 
+    coord.y >= 0 && coord.y < board.height &&
+    !board.snakes.iter().any(|s| s.body.contains(coord)) &&
+    !snake.body.contains(coord)
+}
+
 fn manhattan_distance(a: &Coord, b: &Coord) -> i32 {
     (a.x - b.x).abs() + (a.y - b.y).abs()
+}
+
+fn convert_coord_to_movement(head_coord: &Coord, next_coord: &Coord) -> Movement {
+    if head_coord.x < next_coord.x {
+        return Movement::Right;
+    } else if head_coord.x > next_coord.x {
+        return Movement::Left;
+    } else if head_coord.y < next_coord.y {
+        return Movement::Up;
+    } else if head_coord.y > next_coord.y {
+        return Movement::Down;
+    } else {
+        return Movement::Up;
+    }
 }
 
 fn is_stacked(snake: &Battlesnake) -> bool {

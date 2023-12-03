@@ -29,9 +29,27 @@ pub struct WeightedMovement {
     pub probability: f32,
 }
 
-
 pub struct WeightedMovementSet {
     pub moves: Vec<WeightedMovement>,
+}
+
+impl std::fmt::Display for WeightedMovementSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut s = String::new();
+        if self.moves.is_empty() {
+            return write!(f, "[]");
+        }
+
+        for wm in self.moves.iter().take(self.moves.len() - 1).rev() {
+            s.push_str(&format!("{{{}, {}, {}}}", wm.movement, wm.position, wm.probability));
+            s.push_str(", ");
+        }
+
+        let wm = &self.moves[self.moves.len() - 1];
+        s.push_str(&format!("{{{}, {}, {}}}", wm.movement, wm.position, wm.probability));
+
+        write!(f, "[{}]", s)
+    }
 }
 
 impl WeightedMovementSet {
