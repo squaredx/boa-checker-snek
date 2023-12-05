@@ -1,8 +1,46 @@
-FROM rust:1.63
+####################################################################################################
+## Builder - aarch64-unknown-linux-gnu
+####################################################################################################
+FROM rust:latest AS builder
 
-COPY . /usr/app
-WORKDIR /usr/app
+RUN rustup target add aarch64-unknown-linux-gnu
+RUN apt update && apt install -y musl-tools musl-dev
+RUN update-ca-certificates
 
-RUN cargo install --path .
+# Create appuser
+ENV USER=app
+ENV UID=10001
 
-CMD ["starter-snake-rust"]
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    "${USER}"
+
+WORKDIR /app
+
+COPY ./ .
+
+RUN cargo build --target aarch64-unknown-linux-gnu --release
+
+####################################################################################################
+## Final image
+####################################################################################################
+FROM scratch
+
+# Import from builder.
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+
+WORKDIR /app
+
+# Copy our build
+COPY --from=builder /app/target/aarch64-unknown-linux-gnu/release/boa-checker-snek ./
+
+# Use an unprivileged user.
+USER app:app
+
+CMD ["/app/boa-checker-snek"]
