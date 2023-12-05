@@ -29,7 +29,7 @@ RUN cargo build --target aarch64-unknown-linux-gnu --release
 ####################################################################################################
 ## Final image
 ####################################################################################################
-FROM scratch
+FROM alpine:latest
 
 # Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd
@@ -42,5 +42,7 @@ COPY --from=builder /app/target/aarch64-unknown-linux-gnu/release/boa-checker-sn
 
 # Use an unprivileged user.
 USER app:app
+
+EXPOSE 8000
 
 CMD ["/app/boa-checker-snek"]

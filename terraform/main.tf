@@ -1,45 +1,33 @@
 provider "aws" {
-  region = "us-east-1"
+  region = "us-west-2"
 }
 
-resource "aws_instance" "example" {
-  ami           = "ami-12345678"  # Replace with a valid AMI for your region
-  instance_type = "t2.micro"
-  key_name      = "your-key-name" # Replace with your key name
+data "template_file" "user_data" {
+  template = "${file("setup.sh")}"
+}
+
+resource "aws_instance" "snek" {
+  ami           = "ami-058a0afa5f1acc977"  # Replace with a valid AMI for your region
+  instance_type = "t4g.small"
+  key_name      = "" # Replace with your key name
 
   # Security Group to allow Port 8000
-  vpc_security_group_ids = [aws_security_group.instance_sg.id]
+  vpc_security_group_ids = [aws_security_group.instance_sg.id, aws_security_group.ssh_sg.id]
 
   # User data script to install Rust, unzip, and run the Rust project
-  user_data = <<-EOF
-              #!/bin/bash
-              # Install Rust
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-              source $HOME/.cargo/env
-
-              # Install unzip
-              sudo dnf install -y unzip
-
-              # Unzip the file to the home directory
-              mkdir $HOME/project
-              unzip /tmp/deploy.zip -d $HOME/project
-
-              # Change directory to the project and build the Rust project
-              cd $HOME/project
-              cargo build --release
-
-              # Run the Rust project
-              ./target/release/boa-checker-snek
-              EOF
+  user_data = "${data.template_file.user_data.rendered}"
 
   # Provisioner to copy a ZIP file
   provisioner "file" {
     source      = "deploy.zip"
-    destination = "/tmp/fildeploye.zip"
-  }
+    destination = "/tmp/deploy.zip"
 
-  tags = {
-    Name = "ExampleInstance"
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = file("") # Replace with your private key path
+      host        = self.public_ip
+    }
   }
 }
 
@@ -53,6 +41,25 @@ resource "aws_security_group" "instance_sg" {
     to_port     = 8000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "ssh_sg" {
+  name        = "allow_ssh"
+  description = "Allow SSH inbound traffic from my IP"
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["<IP>/32"] # Replace with your IP
   }
 
   egress {
