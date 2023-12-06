@@ -1,6 +1,8 @@
 use log::info;
 use serde_json::{json, Value};
 use pathfinding::prelude::astar;
+use std::cmp::Ordering;
+use std::collections::{HashSet, VecDeque};
 
 use crate::{Battlesnake, Board, Game, Coord};
 use crate::game::movement::{Movement, WeightedMovementSet};
@@ -43,13 +45,22 @@ pub fn handle_move(_game: &Game, turn: &u32, _board: &Board, you: &Battlesnake) 
 
     avoid_out_of_bounds(board_width, board_height,  &mut moves);
     avoid_myself(&you, &mut moves);
-    avoid_baddies(&_board.snakes, &mut moves);
-    //avoid_small_spaces
+    avoid_baddies(&_board.snakes, you, &mut moves);
+
+    for future_move in moves.moves.clone() {
+        let accessible_area = flood_fill_bfs(&future_move.position, &_board, you);
+        println!("ACCESSIBLE AREA {} for move {}", accessible_area, future_move.movement.to_string());
+        let probability_factor = calculate_flood_fill_probability_factor(accessible_area as u32, you.length);
+        let updated_probability = moves.get_probability(&future_move.movement) * (1.0 + probability_factor);
+
+        println!("UPDATED PROBABILITY TO {} for move {}", updated_probability, future_move.movement.to_string());
+        moves.update_probability(&future_move.movement, updated_probability);
+    }
 
     if you.health <= 50 {
         let closest_food = find_closest_food(&you.body[0], &_board);
         if let Some(food) = closest_food {
-            let path_to_food = find_path_to_food(&you, &_board, &you.body[0], &food);
+            let path_to_food = find_path_to_food(&_board, &you.body[0], &food);
 
             if let Some(path) = path_to_food {
                 let next_coord = path.0.get(1).cloned().unwrap();
@@ -97,11 +108,17 @@ fn avoid_myself(snake: &Battlesnake, set: &mut WeightedMovementSet) {
     }
 }
 
-fn avoid_baddies(baddies: &Vec<Battlesnake>, set: &mut WeightedMovementSet) {
-    for baddy in baddies {
+fn avoid_baddies(baddies: &Vec<Battlesnake>, snake: &Battlesnake, set: &mut WeightedMovementSet) {
+    let filtered_baddies: Vec<Battlesnake> = baddies
+        .iter()
+        .filter(|baddy| baddy.id != snake.id)
+        .cloned()
+        .collect();
+
+    for baddy in filtered_baddies {
         let baddy_head = &baddy.body[0];
-        let baddy_tail = get_tail(baddy);
-        let baddy_stacked = is_stacked(baddy);
+        let baddy_tail = get_tail(&baddy);
+        let baddy_stacked = is_stacked(&baddy);
 
         for future_move in set.moves.clone() {
             let distance = manhattan_distance(&future_move.position, baddy_head);
@@ -119,10 +136,52 @@ fn avoid_baddies(baddies: &Vec<Battlesnake>, set: &mut WeightedMovementSet) {
     }
 }
 
-fn find_path_to_food(snake: &Battlesnake, board: &Board, start: &Coord, goal: &Coord) -> Option<(Vec<Coord>, i32)> {
+fn flood_fill_bfs(start: &Coord, board: &Board, snake: &Battlesnake) -> usize {
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    let directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]; // Up, Down, Left, Right
+
+    queue.push_back(start.clone());
+    visited.insert(start.clone());
+
+    let mut accessible_area = 0;
+
+    while let Some(coord) = queue.pop_front() {
+        accessible_area += 1;
+        if accessible_area as u32 > snake.length + (snake.length / 2) {
+            break;
+        }
+        for (dx, dy) in directions { // Up, Down, Left, Right
+            let next_coord = Coord {
+                x: coord.x + dx,
+                y: coord.y + dy,
+            };
+
+            if pathfinding_is_valid(board, &next_coord) && !visited.contains(&next_coord) {
+                visited.insert(next_coord.clone());
+                queue.push_back(next_coord);
+            }
+        }
+    }
+
+    accessible_area
+}
+
+fn calculate_flood_fill_probability_factor(accessible_area: u32, snake_length: u32) -> f32 {
+    match accessible_area.cmp(&snake_length) {
+        Ordering::Less => -((snake_length - accessible_area) as f32) / snake_length as f32,
+        Ordering::Equal => 0.0,
+        Ordering::Greater => {
+            let excess_area = accessible_area - snake_length;
+            (excess_area as f32 / snake_length as f32).min(0.2)
+        },
+    }
+}
+
+fn find_path_to_food(board: &Board, start: &Coord, goal: &Coord) -> Option<(Vec<Coord>, i32)> {
     astar(
         start,
-        |p| get_neighbors(snake, board, p),
+        |p| get_neighbors(board, p),
         |p| manhattan_distance(p, goal),
         |p| *p == *goal,
     )
@@ -143,7 +202,7 @@ fn find_closest_food(head_coord: &Coord, board: &Board) -> Option<Coord> {
     closest_food
 }
 
-fn get_neighbors(snake: &Battlesnake, board: &Board, coord: &Coord) -> Vec<(Coord, i32)> {
+fn get_neighbors(board: &Board, coord: &Coord) -> Vec<(Coord, i32)> {
     let mut neighbors = Vec::new();
     let directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]; // Up, Down, Left, Right
 
@@ -152,7 +211,7 @@ fn get_neighbors(snake: &Battlesnake, board: &Board, coord: &Coord) -> Vec<(Coor
             x: coord.x + dx,
             y: coord.y + dy,
         };
-        if astar_is_valid(snake, board, &new_coord) {
+        if pathfinding_is_valid(board, &new_coord) {
             neighbors.push((new_coord, 1)); // Each move costs 1
         }
     }
@@ -160,11 +219,10 @@ fn get_neighbors(snake: &Battlesnake, board: &Board, coord: &Coord) -> Vec<(Coor
     neighbors
 }
 
-fn astar_is_valid(snake: &Battlesnake, board: &Board, coord: &Coord) -> bool {
+fn pathfinding_is_valid(board: &Board, coord: &Coord) -> bool {
     coord.x >= 0 && coord.x < board.width && 
     coord.y >= 0 && coord.y < board.height &&
-    !board.snakes.iter().any(|s| s.body.contains(coord)) &&
-    !snake.body.contains(coord)
+    !board.snakes.iter().any(|s| s.body.contains(coord))
 }
 
 fn manhattan_distance(a: &Coord, b: &Coord) -> i32 {
