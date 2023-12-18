@@ -17,10 +17,10 @@ pub fn handle_info() -> Value {
 
     return json!({
         "apiversion": "1",
-        "author": "squaredx", // TODO: Your Battlesnake Username
-        "color": "#0099cc", // TODO: Choose color
-        "head": "silly", // TODO: Choose head
-        "tail": "nr-booster", // TODO: Choose tail
+        "author": "squaredx",
+        "color": "#0099cc",
+        "head": "silly",
+        "tail": "nr-booster",
     });
 }
 

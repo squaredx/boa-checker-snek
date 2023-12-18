@@ -1,3 +1,4 @@
+// Based on https://weitzel.dev/post/battlesnake-intro/
 use std::cmp::Ordering;
 use rand::Rng;
 

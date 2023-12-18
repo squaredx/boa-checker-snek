@@ -1,33 +1,19 @@
-# Battlesnake Rust Starter Project
+# Boa Checker Snek
 
-An official Battlesnake template written in Rust. Get started at [play.battlesnake.com](https://play.battlesnake.com).
+Used to compete in the Hack Regina Rookie tournament & as an excuse for me to use rust 😊
 
-![Battlesnake Logo](https://media.battlesnake.com/social/StarterSnakeGitHubRepos_Rust.png)
+The code should (mostly) be self-explanatory.
 
-This project is a great starting point for anyone wanting to program their first Battlesnake in Rust. It can be run locally or easily deployed to a cloud provider of your choosing. See the [Battlesnake API Docs](https://docs.battlesnake.com/api) for more detail. 
-
-[![Run on Replit](https://repl.it/badge/github/BattlesnakeOfficial/starter-snake-rust)](https://replit.com/@Battlesnake/starter-snake-rust)
+Read the full devlog on my blog: https://squaredx.dev
 
 ## Technologies Used
 
 This project uses [Rust](https://www.rust-lang.org/) and [Rocket](https://rocket.rs). It also comes with an optional [Dockerfile](https://docs.docker.com/engine/reference/builder/) to help with deployment.
 
-## Run Your Battlesnake
+## Run boa-checker-snek
 
 ```sh
 cargo run
-```
-
-You should see the following output once it is running
-
-```sh
-🚀 Rocket has launched from http://0.0.0.0:8000
-```
-
-Open [localhost:8000](http://localhost:8000) in your browser and you should see
-
-```json
-{"apiversion":"1","author":"","color":"#888888","head":"default","tail":"default"}
 ```
 
 ## Play a Game Locally
@@ -39,11 +25,11 @@ Install the [Battlesnake CLI](https://github.com/BattlesnakeOfficial/rules/tree/
 Command to run a local game
 
 ```sh
-battlesnake play -W 11 -H 11 --name 'Rust Starter Project' --url http://localhost:8000 -g solo --browser
+battlesnake play -W 11 -H 11 --name 'Boa Checker' --url http://localhost:8000 -g solo --browser
 ```
 
-## Next Steps
+## How to deploy
 
-Continue with the [Battlesnake Quickstart Guide](https://docs.battlesnake.com/quickstart) to customize and improve your Battlesnake's behavior.
-
-**Note:** To play games on [play.battlesnake.com](https://play.battlesnake.com) you'll need to deploy your Battlesnake to a live web server OR use a port forwarding tool like [ngrok](https://ngrok.com/) to access your server locally.
+Use terraform and ensure the AWS CLI is setup on your computer. Navigate to the `terraform` folder and modify `main.tf` where the comments are
+- Ensure your key name, instance AMI, and private key path are specified
+- I never actually got the setup script to run properly so that is an exercise left to the reader :)
