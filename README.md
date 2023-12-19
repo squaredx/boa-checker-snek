@@ -4,7 +4,7 @@ Used to compete in the Hack Regina Rookie tournament & as an excuse for me to us
 
 The code should (mostly) be self-explanatory.
 
-Read the full devlog on my blog: https://squaredx.dev
+Read the full devlog on my blog: [SquaredX.dev - Building Boa Checker, a Rust-Based Bot for Battlesnakes](https://www.squaredx.dev/building-rust-boa-checker-battlesnake/)
 
 ## Technologies Used
 
